@@ -1,5 +1,12 @@
 import { Document, Model, Query, Schema } from 'mongoose';
 
+interface IQuery extends Query<Document> {
+  options: { [option: string]: any };
+  _conditions: any;
+  model: Model<any>;
+  op: string;
+}
+
 const checkPlan = (plan: any) => {
   const { stage, filter, sortPattern, inputStage, inputStages = [] } = plan;
 
@@ -53,20 +60,15 @@ const mongooseExplain = (schema: Schema, options: any) => {
     }
   };
 
-  const execExplain = function <T extends Document>(this: Query<T> & {
-    _conditions: any;
-    options: any;
-    model: Model<T>;
-    op: string;
-  }, next: any) {
+  const execExplain = function(this: IQuery, next: any) {
     const keys = Object.keys(this._conditions);
     if (!('sort' in this.options) || (() => {
-        const sortKeys = Object.keys(this.options.sort);
-        if (sortKeys.length === 0) {
-          return true;
-        }
-        return sortKeys.length === 1 && keys[0] === '_id';
-      })()) {
+      const sortKeys = Object.keys(this.options.sort);
+      if (sortKeys.length === 0) {
+        return true;
+      }
+      return sortKeys.length === 1 && keys[0] === '_id';
+    })()) {
       if (keys.length === 0 || (keys.length === 1 && keys[0] === '_id')) {
         return next();
       }
@@ -82,8 +84,14 @@ const mongooseExplain = (schema: Schema, options: any) => {
     });
   };
 
-  schema.pre('find', execExplain);
-  schema.pre('findOne', execExplain);
+  schema.pre<IQuery>('count', execExplain);
+  schema.pre<IQuery>('find', execExplain);
+  schema.pre<IQuery>('findOne', execExplain);
+  schema.pre<IQuery>('findOneAndRemove', execExplain);
+  schema.pre<IQuery>('findOneAndUpdate', execExplain);
+  schema.pre<IQuery>('update', execExplain);
+  schema.pre<IQuery>('updateOne', execExplain);
+  schema.pre<IQuery>('updateMany', execExplain);
 };
 
 export = mongooseExplain;
